@@ -1,4 +1,4 @@
-# Finx Pulse Backend
+# Finx Backend
 
 Backend API for **Finx Pulse**, a modern financial platform.
 
