@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from rest_framework.test import APITestCase
 
 from dashboard.models import Dashboard
@@ -123,6 +124,44 @@ class MonthPageDashboardTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["title"], "October budget")
+
+    def test_model_validation_rejects_duplicate_month_for_admin_forms(self):
+        duplicate = MonthPage(
+            user=self.user,
+            title="Another October",
+            month=10,
+            year=2026,
+        )
+
+        with self.assertRaises(ValidationError) as error:
+            duplicate.full_clean()
+
+        self.assertIn("month", error.exception.message_dict)
+
+    def test_model_validation_rejects_duplicate_title_for_admin_forms(self):
+        duplicate = MonthPage(
+            user=self.user,
+            title="october 2026",
+            month=11,
+            year=2026,
+        )
+
+        with self.assertRaises(ValidationError) as error:
+            duplicate.full_clean()
+
+        self.assertIn("title", error.exception.message_dict)
+
+    def test_soft_deleted_month_does_not_block_reuse(self):
+        self.month_page.is_deleted = True
+        self.month_page.save()
+        replacement = MonthPage(
+            user=self.user,
+            title="October again",
+            month=10,
+            year=2026,
+        )
+
+        replacement.full_clean()
 
     def test_deduct_marks_remaining_spends_and_updates_selected_balance(self):
         response = self.client.post(

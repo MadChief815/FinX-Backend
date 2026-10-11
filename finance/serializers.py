@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .models import Income, Loan, MonthPage, Spend, SubPage, SubSpend
@@ -53,18 +54,18 @@ class MonthPageSerializer(serializers.ModelSerializer):
         title = attrs.get("title", self.instance.title if self.instance else None)
         month = attrs.get("month", self.instance.month if self.instance else None)
         year = attrs.get("year", self.instance.year if self.instance else None)
-
-        existing_pages = MonthPage.objects.filter(user=request.user, year=year)
+        month_page = MonthPage(
+            user=request.user,
+            title=title,
+            month=month,
+            year=year,
+        )
         if self.instance is not None:
-            existing_pages = existing_pages.exclude(pk=self.instance.pk)
-
-        errors = {}
-        if existing_pages.filter(month=month).exists():
-            errors["month"] = "A month page already exists for this month and year."
-        if existing_pages.filter(title__iexact=title).exists():
-            errors["title"] = "A month page with this title already exists in this year."
-        if errors:
-            raise serializers.ValidationError(errors)
+            month_page.pk = self.instance.pk
+        try:
+            month_page.clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict) from exc
         return attrs
 
 

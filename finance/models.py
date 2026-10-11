@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
@@ -32,6 +33,26 @@ class MonthPage(SoftDeleteModel):
     )
     year = models.IntegerField(validators=[MinValueValidator(1)])
     is_completed = models.BooleanField(default=False)
+
+    def clean(self):
+        super().clean()
+        if not self.user_id or self.month is None or self.year is None or not self.title:
+            return
+
+        duplicate_pages = MonthPage.objects.filter(
+            user_id=self.user_id,
+            year=self.year,
+        )
+        if self.pk:
+            duplicate_pages = duplicate_pages.exclude(pk=self.pk)
+
+        errors = {}
+        if duplicate_pages.filter(month=self.month).exists():
+            errors["month"] = "A month page already exists for this month and year."
+        if duplicate_pages.filter(title__iexact=self.title).exists():
+            errors["title"] = "A month page with this title already exists in this year."
+        if errors:
+            raise ValidationError(errors)
 
     def __str__(self):
         return self.title

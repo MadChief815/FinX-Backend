@@ -3,18 +3,15 @@ from django.contrib import admin
 from .models import Income, Loan, MonthPage, Spend, SubPage, SubSpend
 
 
-class SoftDeleteModelAdmin(admin.ModelAdmin):
+class FinanceModelAdmin(admin.ModelAdmin):
     readonly_fields = ("is_deleted", "created_at", "updated_at")
 
     def get_queryset(self, request):
         return self.model.all_objects.get_queryset()
 
-    def has_delete_permission(self, request, obj=None):
-        return False
-
 
 @admin.register(MonthPage)
-class MonthPageAdmin(SoftDeleteModelAdmin):
+class MonthPageAdmin(FinanceModelAdmin):
     list_display = (
         "title",
         "user",
@@ -30,7 +27,7 @@ class MonthPageAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(Spend)
-class SpendAdmin(SoftDeleteModelAdmin):
+class SpendAdmin(FinanceModelAdmin):
     list_display = (
         "title",
         "month_page",
@@ -46,7 +43,7 @@ class SpendAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(SubPage)
-class SubPageAdmin(SoftDeleteModelAdmin):
+class SubPageAdmin(FinanceModelAdmin):
     list_display = (
         "title",
         "spend",
@@ -60,7 +57,7 @@ class SubPageAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(SubSpend)
-class SubSpendAdmin(SoftDeleteModelAdmin):
+class SubSpendAdmin(FinanceModelAdmin):
     list_display = (
         "title",
         "sub_page",
@@ -79,7 +76,7 @@ class SubSpendAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(Loan)
-class LoanAdmin(SoftDeleteModelAdmin):
+class LoanAdmin(FinanceModelAdmin):
     list_display = (
         "person_name",
         "user",
@@ -95,7 +92,7 @@ class LoanAdmin(SoftDeleteModelAdmin):
 
 
 @admin.register(Income)
-class IncomeAdmin(SoftDeleteModelAdmin):
+class IncomeAdmin(FinanceModelAdmin):
     list_display = (
         "title",
         "user",
