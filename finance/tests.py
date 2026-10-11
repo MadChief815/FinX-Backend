@@ -52,6 +52,78 @@ class MonthPageDashboardTests(APITestCase):
             },
         )
 
+    def test_cannot_create_duplicate_month_for_same_year(self):
+        response = self.client.post(
+            "/finance/months/",
+            {
+                "title": "Another October",
+                "month": 10,
+                "year": 2026,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("month", response.data["message"])
+
+    def test_cannot_create_duplicate_title_in_same_year(self):
+        response = self.client.post(
+            "/finance/months/",
+            {
+                "title": "october 2026",
+                "month": 11,
+                "year": 2026,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("title", response.data["message"])
+
+    def test_cannot_edit_month_to_duplicate_existing_month(self):
+        another_month = MonthPage.objects.create(
+            user=self.user,
+            title="November 2026",
+            month=11,
+            year=2026,
+        )
+
+        response = self.client.patch(
+            f"/finance/months/{another_month.pk}/",
+            {"month": 10},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("month", response.data["message"])
+
+    def test_cannot_edit_title_to_duplicate_title_in_same_year(self):
+        another_month = MonthPage.objects.create(
+            user=self.user,
+            title="November 2026",
+            month=11,
+            year=2026,
+        )
+
+        response = self.client.patch(
+            f"/finance/months/{another_month.pk}/",
+            {"title": "october 2026"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("title", response.data["message"])
+
+    def test_editing_month_without_creating_duplicate_is_allowed(self):
+        response = self.client.patch(
+            f"/finance/months/{self.month_page.pk}/",
+            {"title": "October budget"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["title"], "October budget")
+
     def test_deduct_marks_remaining_spends_and_updates_selected_balance(self):
         response = self.client.post(
             f"/finance/months/{self.month_page.pk}/deduct/",

@@ -48,6 +48,25 @@ class MonthPageSerializer(serializers.ModelSerializer):
     def get_totals(self, month_page):
         return calculate_month_totals(month_page)
 
+    def validate(self, attrs):
+        request = self.context["request"]
+        title = attrs.get("title", self.instance.title if self.instance else None)
+        month = attrs.get("month", self.instance.month if self.instance else None)
+        year = attrs.get("year", self.instance.year if self.instance else None)
+
+        existing_pages = MonthPage.objects.filter(user=request.user, year=year)
+        if self.instance is not None:
+            existing_pages = existing_pages.exclude(pk=self.instance.pk)
+
+        errors = {}
+        if existing_pages.filter(month=month).exists():
+            errors["month"] = "A month page already exists for this month and year."
+        if existing_pages.filter(title__iexact=title).exists():
+            errors["title"] = "A month page with this title already exists in this year."
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
+
 
 class DeductSpendingSerializer(serializers.Serializer):
     source = serializers.ChoiceField(choices=["bank", "cash"])
