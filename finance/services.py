@@ -120,18 +120,47 @@ def update_sub_page(sub_page, validated_data):
 
 @transaction.atomic
 def soft_delete_sub_page(sub_page):
-    if not sub_page.is_deleted:
-        sub_page.is_deleted = True
-        sub_page.save()
-
-        spend = sub_page.spend
-        if spend.has_subpage:
-            spend.has_subpage = False
-            spend.save(update_fields=["has_subpage", "updated_at"])
+    soft_delete(sub_page)
 
 
 @transaction.atomic
 def soft_delete(instance):
-    if not instance.is_deleted:
-        instance.is_deleted = True
-        instance.save()
+    if instance.is_deleted:
+        return
+
+    now = timezone.now()
+    if isinstance(instance, MonthPage):
+        SubSpend.all_objects.filter(
+            sub_page__spend__month_page=instance,
+            is_deleted=False,
+        ).update(is_deleted=True, updated_at=now)
+        SubPage.all_objects.filter(
+            spend__month_page=instance,
+            is_deleted=False,
+        ).update(is_deleted=True, updated_at=now)
+        Spend.all_objects.filter(
+            month_page=instance,
+            is_deleted=False,
+        ).update(is_deleted=True, updated_at=now)
+    elif isinstance(instance, Spend):
+        SubSpend.all_objects.filter(
+            sub_page__spend=instance,
+            is_deleted=False,
+        ).update(is_deleted=True, updated_at=now)
+        SubPage.all_objects.filter(
+            spend=instance,
+            is_deleted=False,
+        ).update(is_deleted=True, updated_at=now)
+    elif isinstance(instance, SubPage):
+        SubSpend.all_objects.filter(
+            sub_page=instance,
+            is_deleted=False,
+        ).update(is_deleted=True, updated_at=now)
+
+        spend = instance.spend
+        if spend.has_subpage:
+            spend.has_subpage = False
+            spend.save(update_fields=["has_subpage", "updated_at"])
+
+    instance.is_deleted = True
+    instance.save(update_fields=["is_deleted", "updated_at"])

@@ -6,7 +6,7 @@ from rest_framework.test import APITestCase
 
 from dashboard.models import Dashboard
 
-from .models import MonthPage, Spend
+from .models import MonthPage, Spend, SubPage, SubSpend
 
 
 class MonthPageDashboardTests(APITestCase):
@@ -162,6 +162,54 @@ class MonthPageDashboardTests(APITestCase):
         )
 
         replacement.full_clean()
+
+    def test_soft_deleting_month_soft_deletes_all_descendants(self):
+        spend = Spend.objects.create(
+            month_page=self.month_page,
+            title="Food",
+            amount=Decimal("100.00"),
+        )
+        sub_page = SubPage.objects.create(spend=spend, title="Food breakdown")
+        sub_spend = SubSpend.objects.create(
+            sub_page=sub_page,
+            title="Groceries",
+            amount=Decimal("50.00"),
+        )
+
+        response = self.client.delete(f"/finance/months/{self.month_page.pk}/")
+
+        self.assertEqual(response.status_code, 204)
+        self.month_page.refresh_from_db()
+        spend.refresh_from_db()
+        sub_page.refresh_from_db()
+        sub_spend.refresh_from_db()
+        self.assertTrue(self.month_page.is_deleted)
+        self.assertTrue(spend.is_deleted)
+        self.assertTrue(sub_page.is_deleted)
+        self.assertTrue(sub_spend.is_deleted)
+
+    def test_soft_deleting_spend_soft_deletes_subpage_and_subspends(self):
+        sub_page = SubPage.objects.create(
+            spend=Spend.objects.get(title="Pending spend"),
+            title="Spend breakdown",
+        )
+        sub_spend = SubSpend.objects.create(
+            sub_page=sub_page,
+            title="Breakdown item",
+            amount=Decimal("10.00"),
+        )
+
+        response = self.client.delete(
+            f"/finance/spends/{sub_page.spend_id}/"
+        )
+
+        self.assertEqual(response.status_code, 204)
+        spend = Spend.all_objects.get(pk=sub_page.spend_id)
+        sub_page.refresh_from_db()
+        sub_spend.refresh_from_db()
+        self.assertTrue(spend.is_deleted)
+        self.assertTrue(sub_page.is_deleted)
+        self.assertTrue(sub_spend.is_deleted)
 
     def test_deduct_marks_remaining_spends_and_updates_selected_balance(self):
         response = self.client.post(
