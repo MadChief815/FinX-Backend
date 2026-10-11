@@ -1,2 +1,89 @@
-from django.test import TestCase
+from decimal import Decimal
 
+from django.contrib.auth import get_user_model
+from rest_framework.test import APITestCase
+
+from dashboard.models import Dashboard
+
+from .models import MonthPage, Spend
+
+
+class MonthPageDashboardTests(APITestCase):
+    def setUp(self):
+        user_model = get_user_model()
+        self.user = user_model.objects.create_user(
+            username="finance-owner",
+            password="test-password",
+        )
+        self.dashboard = Dashboard.objects.create(
+            user=self.user,
+            bank_money=Decimal("100.00"),
+            cash_money=Decimal("25.00"),
+        )
+        self.month_page = MonthPage.objects.create(
+            user=self.user,
+            title="October 2026",
+            month=10,
+            year=2026,
+        )
+        Spend.objects.create(
+            month_page=self.month_page,
+            title="Completed spend",
+            amount=Decimal("5.00"),
+            is_completed=True,
+        )
+        Spend.objects.create(
+            month_page=self.month_page,
+            title="Pending spend",
+            amount=Decimal("30.00"),
+        )
+        self.client.force_authenticate(self.user)
+
+    def test_month_page_response_includes_spend_totals(self):
+        response = self.client.get("/finance/months/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data["results"][0]["totals"],
+            {
+                "total": Decimal("35.00"),
+                "spent": Decimal("5.00"),
+                "to_spend": Decimal("30.00"),
+            },
+        )
+
+    def test_deduct_marks_remaining_spends_and_updates_selected_balance(self):
+        response = self.client.post(
+            f"/finance/months/{self.month_page.pk}/deduct/",
+            {"source": "bank"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["deducted"], Decimal("30.00"))
+        self.assertEqual(
+            response.data["dashboard"]["bank_money"],
+            Decimal("70.00"),
+        )
+        self.assertEqual(
+            response.data["dashboard"]["cash_money"],
+            Decimal("25.00"),
+        )
+        pending_spend = Spend.objects.get(title="Pending spend")
+        self.assertTrue(pending_spend.is_completed)
+
+    def test_insufficient_balance_leaves_balance_and_spends_unchanged(self):
+        self.dashboard.bank_money = Decimal("10.00")
+        self.dashboard.save()
+
+        response = self.client.post(
+            f"/finance/months/{self.month_page.pk}/deduct/",
+            {"source": "bank"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(response.data["status_code"], 422)
+        self.dashboard.refresh_from_db()
+        self.assertEqual(self.dashboard.bank_money, Decimal("10.00"))
+        self.assertFalse(Spend.objects.get(title="Pending spend").is_completed)

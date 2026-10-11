@@ -1,1 +1,9 @@
-from FinX_Pulse_Backend.serializers import BaseSerializer
+from rest_framework import serializers
+
+from .models import Dashboard
+
+
+class DashboardSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Dashboard
+        fields = ["bank_money", "cash_money"]
