@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from dashboard.models import Dashboard
 
-from .models import MonthPage, Spend, SubPage
+from .models import MonthPage, Spend, SubPage, SubSpend
 
 
 ZERO = Decimal("0.00")

@@ -178,7 +178,11 @@ class MonthPageDashboardTests(APITestCase):
 
         response = self.client.delete(f"/finance/months/{self.month_page.pk}/")
 
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data,
+            {"success": True, "message": "Resource deleted successfully."},
+        )
         self.month_page.refresh_from_db()
         spend.refresh_from_db()
         sub_page.refresh_from_db()
@@ -203,13 +207,26 @@ class MonthPageDashboardTests(APITestCase):
             f"/finance/spends/{sub_page.spend_id}/"
         )
 
-        self.assertEqual(response.status_code, 204)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data,
+            {"success": True, "message": "Resource deleted successfully."},
+        )
         spend = Spend.all_objects.get(pk=sub_page.spend_id)
         sub_page.refresh_from_db()
         sub_spend.refresh_from_db()
         self.assertTrue(spend.is_deleted)
         self.assertTrue(sub_page.is_deleted)
         self.assertTrue(sub_spend.is_deleted)
+
+    def test_deleting_missing_month_returns_error(self):
+        response = self.client.delete(
+            f"/finance/months/{self.month_page.pk + 999999}/"
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(response.data["error"])
+        self.assertEqual(response.data["status_code"], 404)
 
     def test_deduct_marks_remaining_spends_and_updates_selected_balance(self):
         response = self.client.post(
