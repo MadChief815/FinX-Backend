@@ -93,7 +93,10 @@ def deduct_month_spending(month_page, source):
 
 @transaction.atomic
 def create_sub_page(validated_data):
-    spend = validated_data["spend"]
+    spend = Spend.objects.select_for_update().get(
+        pk=validated_data["spend"].pk,
+    )
+    validated_data["spend"] = spend
     sub_page = SubPage.all_objects.filter(spend=spend).first()
 
     if sub_page is None:
@@ -107,6 +110,7 @@ def create_sub_page(validated_data):
     if not spend.has_subpage:
         spend.has_subpage = True
         spend.save(update_fields=["has_subpage", "updated_at"])
+    _sync_spend_amount(spend)
     return sub_page
 
 
@@ -116,6 +120,47 @@ def update_sub_page(sub_page, validated_data):
         setattr(sub_page, field, value)
     sub_page.save()
     return sub_page
+
+
+def _sync_spend_amount(spend):
+    amount = (
+        SubSpend.objects.filter(sub_page__spend=spend).aggregate(total=Sum("amount"))[
+            "total"
+        ]
+        or ZERO
+    )
+    spend.amount = amount
+    spend.save(update_fields=["amount", "updated_at"])
+
+
+@transaction.atomic
+def create_sub_spend(validated_data):
+    sub_page = validated_data["sub_page"]
+    spend = Spend.objects.select_for_update().get(pk=sub_page.spend_id)
+    sub_spend = SubSpend.objects.create(**validated_data)
+    _sync_spend_amount(spend)
+    return sub_spend
+
+
+@transaction.atomic
+def update_sub_spend(sub_spend, validated_data):
+    sub_spend = SubSpend.objects.select_for_update().get(pk=sub_spend.pk)
+    old_spend_id = sub_spend.sub_page.spend_id
+    new_sub_page = validated_data.get("sub_page", sub_spend.sub_page)
+    spend_ids = sorted({old_spend_id, new_sub_page.spend_id})
+    spends = list(
+        Spend.objects.select_for_update()
+        .filter(pk__in=spend_ids)
+        .order_by("pk")
+    )
+
+    for field, value in validated_data.items():
+        setattr(sub_spend, field, value)
+    sub_spend.save()
+
+    for spend in spends:
+        _sync_spend_amount(spend)
+    return sub_spend
 
 
 @transaction.atomic
@@ -161,6 +206,12 @@ def soft_delete(instance):
         if spend.has_subpage:
             spend.has_subpage = False
             spend.save(update_fields=["has_subpage", "updated_at"])
+    elif isinstance(instance, SubSpend):
+        spend = Spend.objects.select_for_update().get(
+            pk=instance.sub_page.spend_id,
+        )
 
     instance.is_deleted = True
     instance.save(update_fields=["is_deleted", "updated_at"])
+    if isinstance(instance, SubSpend):
+        _sync_spend_amount(spend)

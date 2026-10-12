@@ -263,3 +263,63 @@ class MonthPageDashboardTests(APITestCase):
         self.dashboard.refresh_from_db()
         self.assertEqual(self.dashboard.bank_money, Decimal("10.00"))
         self.assertFalse(Spend.objects.get(title="Pending spend").is_completed)
+
+    def test_subspend_changes_keep_parent_spend_amount_in_sync(self):
+        spend = Spend.objects.get(title="Pending spend")
+        sub_page_response = self.client.post(
+            "/finance/subpages/",
+            {"spend": spend.pk, "title": "Spend breakdown"},
+            format="json",
+        )
+        self.assertEqual(sub_page_response.status_code, 201)
+        sub_page_id = sub_page_response.data["id"]
+
+        first_response = self.client.post(
+            "/finance/subspends/",
+            {"sub_page": sub_page_id, "title": "First item", "amount": "5.00"},
+            format="json",
+        )
+        self.assertEqual(first_response.status_code, 201)
+        second_response = self.client.post(
+            "/finance/subspends/",
+            {"sub_page": sub_page_id, "title": "Second item", "amount": "7.00"},
+            format="json",
+        )
+        self.assertEqual(second_response.status_code, 201)
+        spend.refresh_from_db()
+        self.assertEqual(spend.amount, Decimal("12.00"))
+
+        update_response = self.client.patch(
+            f"/finance/subspends/{first_response.data['id']}/",
+            {"amount": "8.00"},
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, 200)
+        spend.refresh_from_db()
+        self.assertEqual(spend.amount, Decimal("15.00"))
+
+        delete_response = self.client.delete(
+            f"/finance/subspends/{second_response.data['id']}/"
+        )
+        self.assertEqual(delete_response.status_code, 200)
+        spend.refresh_from_db()
+        self.assertEqual(spend.amount, Decimal("8.00"))
+
+    def test_spend_with_subpage_cannot_be_directly_updated(self):
+        spend = Spend.objects.get(title="Pending spend")
+        sub_page_response = self.client.post(
+            "/finance/subpages/",
+            {"spend": spend.pk, "title": "Spend breakdown"},
+            format="json",
+        )
+        self.assertEqual(sub_page_response.status_code, 201)
+
+        response = self.client.patch(
+            f"/finance/spends/{spend.pk}/",
+            {"amount": "50.00"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        spend.refresh_from_db()
+        self.assertEqual(spend.amount, Decimal("0.00"))

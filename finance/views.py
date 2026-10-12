@@ -110,6 +110,15 @@ class SubSpendViewSet(FinanceViewSet):
             sub_page__is_deleted=False,
         )
 
+    def perform_create(self, serializer):
+        serializer.instance = services.create_sub_spend(serializer.validated_data)
+
+    def perform_update(self, serializer):
+        serializer.instance = services.update_sub_spend(
+            serializer.instance,
+            serializer.validated_data,
+        )
+
 
 class LoanViewSet(FinanceViewSet):
     serializer_class = LoanSerializer

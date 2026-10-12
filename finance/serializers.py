@@ -93,6 +93,13 @@ class SpendSerializer(PositiveAmountSerializerMixin, serializers.ModelSerializer
         ]
         read_only_fields = ["id", "has_subpage", "created_at", "updated_at"]
 
+    def validate(self, attrs):
+        if self.instance is not None and self.instance.has_subpage and "amount" in attrs:
+            raise serializers.ValidationError(
+                {"amount": "Update this spend's amount through its subspends."}
+            )
+        return attrs
+
 
 class SubPageSerializer(serializers.ModelSerializer):
     spend = UserScopedPrimaryKeyRelatedField(
