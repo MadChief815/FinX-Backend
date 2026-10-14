@@ -41,6 +41,8 @@ def build_dashboard_summary(dashboard):
     return {
         "bank_money": bank_money,
         "cash_money": cash_money,
+        "fixed_deposit_money": dashboard.fixed_deposit_money,
+        "flexible_savings_money": dashboard.flexible_savings_money,
         "total_available": bank_money + cash_money,
         "loan_total": loan_total,
         "income_total": income_total,

@@ -10,6 +10,8 @@ class Dashboard(models.Model):
     )
     bank_money = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     cash_money = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    fixed_deposit_money = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    flexible_savings_money = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
