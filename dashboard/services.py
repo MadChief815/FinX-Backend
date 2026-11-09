@@ -16,7 +16,6 @@ def build_dashboard_summary(dashboard):
     loan_total = (
         Loan.objects.filter(
             user=user,
-            type=Loan.LoanType.BORROWED,
             status=Loan.Status.ACTIVE,
         ).aggregate(total=Sum("amount"))["total"]
         or ZERO
